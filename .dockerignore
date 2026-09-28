@@ -1,0 +1,8 @@
+target/
+envs/
+.git/
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
