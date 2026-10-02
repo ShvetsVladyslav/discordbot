@@ -91,6 +91,7 @@
             <version>1.23.0</version>
         </dependency>
 
+        <!-- TODO: Обновить на более новую версию -->
         <dependency>
             <groupId>net.dv8tion</groupId>
             <artifactId>JDA</artifactId>
