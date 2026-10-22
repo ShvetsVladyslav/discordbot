@@ -47,6 +47,25 @@ class DiscordUsernameCacheTests {
         server.expect(requestTo(FIRST_PAGE)).andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
         assertThat(service.usernameExists("operator")).isFalse();
         assertThat(service.usernameExists("someone_else")).isFalse();
+        assertThat(service.getEventProfile("someone_else"))
+                .isEqualTo(new DiscordMembersService.EventProfile(false, null));
+        server.verify();
+    }
+
+    @Test void profileSharesMembershipCacheAndRefreshesServerNicknameAfterTenMinutes() {
+        server.expect(requestTo(FIRST_PAGE)).andRespond(withSuccess(
+                "[{\"user\":{\"id\":\"123456789012345679\",\"username\":\"operator\",\"global_name\":\"Global\"},\"nick\":\"server nickname\"}]",
+                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(FIRST_PAGE)).andRespond(withSuccess(
+                "[{\"user\":{\"id\":\"123456789012345679\",\"username\":\"operator\",\"global_name\":\"Global\"},\"nick\":null}]",
+                MediaType.APPLICATION_JSON));
+        assertThat(service.usernameExists("operator")).isTrue();
+        assertThat(service.getEventProfile("operator"))
+                .isEqualTo(new DiscordMembersService.EventProfile(true, "server nickname"));
+        now.set(Duration.ofMinutes(10).toNanos());
+        assertThat(service.getEventProfile("operator"))
+                .isEqualTo(new DiscordMembersService.EventProfile(true, "Global"));
+        assertThat(service.usernameExists("operator")).isTrue();
         server.verify();
     }
 

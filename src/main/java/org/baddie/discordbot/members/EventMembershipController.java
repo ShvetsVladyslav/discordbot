@@ -20,9 +20,20 @@ public class EventMembershipController {
     @GetMapping("/exists")
     @Operation(summary = "Check guild membership by Discord username (10-minute cache)")
     public boolean exists(@RequestParam String username) {
+        validateUsername(username);
+        return service.usernameExists(username);
+    }
+
+    @GetMapping("/profile")
+    @Operation(summary = "Get guild display name by Discord username (shared 10-minute cache)")
+    public DiscordMembersService.EventProfile profile(@RequestParam String username) {
+        validateUsername(username);
+        return service.getEventProfile(username);
+    }
+
+    private static void validateUsername(String username) {
         if (username.isBlank() || username.length() > 32) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Discord username");
         }
-        return service.usernameExists(username);
     }
 }

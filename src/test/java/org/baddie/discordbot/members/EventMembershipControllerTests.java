@@ -23,7 +23,17 @@ class EventMembershipControllerTests {
             assertThatThrownBy(() -> controller.exists(username))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                     error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+            assertThatThrownBy(() -> controller.profile(username))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                    error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
         }
         verifyNoInteractions(service);
+    }
+
+    @Test void profileDelegatesExactUsername() {
+        var profile = new DiscordMembersService.EventProfile(true, "server nickname");
+        when(service.getEventProfile("operator")).thenReturn(profile);
+        assertThat(controller.profile("operator")).isEqualTo(profile);
+        verify(service).getEventProfile("operator");
     }
 }

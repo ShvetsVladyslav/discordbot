@@ -15,6 +15,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.function.LongSupplier;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -25,6 +27,7 @@ public class DiscordMembersService {
     private final HttpEntity<Void> request;
     private final LongSupplier nanoTime;
     private List<String> cachedUsernames;
+    private Map<String, String> cachedDisplayNames;
     private long cacheLoadedAt;
     private static final long CACHE_TTL_NANOS = Duration.ofMinutes(10).toNanos();
 
@@ -51,12 +54,27 @@ public class DiscordMembersService {
     }
 
     public synchronized boolean usernameExists(String username) {
+        refreshCacheIfNeeded();
+        return cachedUsernames.contains(username);
+    }
+
+    public synchronized EventProfile getEventProfile(String username) {
+        refreshCacheIfNeeded();
+        String displayName = cachedDisplayNames.get(username);
+        return new EventProfile(displayName != null, displayName);
+    }
+
+    private void refreshCacheIfNeeded() {
         if (cachedUsernames == null || nanoTime.getAsLong() - cacheLoadedAt >= CACHE_TTL_NANOS) {
-            List<String> refreshed = loadMembers().stream().map(member -> member.user().username()).toList();
+            List<DiscordMember> members = loadMembers();
+            List<String> refreshed = members.stream().map(member -> member.user().username()).toList();
+            Map<String, String> displayNames = new HashMap<>();
+            members.forEach(member -> displayNames.put(member.user().username(), displayName(member)));
+            Map<String, String> refreshedDisplayNames = Map.copyOf(displayNames);
             cachedUsernames = List.copyOf(refreshed);
+            cachedDisplayNames = refreshedDisplayNames;
             cacheLoadedAt = nanoTime.getAsLong();
         }
-        return cachedUsernames.contains(username);
     }
 
     private List<DiscordMember> loadMembers() {
@@ -100,6 +118,10 @@ public class DiscordMembersService {
         List<String> roles = Arrays.stream(DiscordMemberRole.values())
                 .filter(role -> member.roles() != null && member.roles().contains(role.getId()))
                 .map(DiscordMemberRole::getDisplayName).toList();
+        return new MemberResponse(displayName(member), roles);
+    }
+
+    private static String displayName(DiscordMember member) {
         String nick = member.nick();
         if (nick == null || nick.isBlank()) {
             nick = member.user().global_name();
@@ -107,9 +129,10 @@ public class DiscordMembersService {
         if (nick == null || nick.isBlank()) {
             nick = member.user().username();
         }
-        return new MemberResponse(nick, roles);
+        return nick;
     }
 
+    public record EventProfile(boolean member, String displayName) {}
     public record MemberResponse(String nick, List<String> roles) {}
     public record DiscordMember(String nick, List<String> roles, DiscordUser user) {}
     public record DiscordUser(String id, String username, String global_name) {}
