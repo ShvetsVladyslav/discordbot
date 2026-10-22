@@ -27,7 +27,7 @@ public class DiscordMembersService {
     private final HttpEntity<Void> request;
     private final LongSupplier nanoTime;
     private List<String> cachedUsernames;
-    private Map<String, String> cachedDisplayNames;
+    private Map<String, EventProfile> cachedProfiles;
     private long cacheLoadedAt;
     private static final long CACHE_TTL_NANOS = Duration.ofMinutes(10).toNanos();
 
@@ -60,19 +60,19 @@ public class DiscordMembersService {
 
     public synchronized EventProfile getEventProfile(String username) {
         refreshCacheIfNeeded();
-        String displayName = cachedDisplayNames.get(username);
-        return new EventProfile(displayName != null, displayName);
+        return cachedProfiles.getOrDefault(username, new EventProfile(false, null, List.of(), null));
     }
 
     private void refreshCacheIfNeeded() {
         if (cachedUsernames == null || nanoTime.getAsLong() - cacheLoadedAt >= CACHE_TTL_NANOS) {
             List<DiscordMember> members = loadMembers();
             List<String> refreshed = members.stream().map(member -> member.user().username()).toList();
-            Map<String, String> displayNames = new HashMap<>();
-            members.forEach(member -> displayNames.put(member.user().username(), displayName(member)));
-            Map<String, String> refreshedDisplayNames = Map.copyOf(displayNames);
+            Map<String, EventProfile> profiles = new HashMap<>();
+            members.forEach(member -> profiles.put(member.user().username(), new EventProfile(
+                    true, displayName(member), member.roles() == null ? List.of() : List.copyOf(member.roles()), member.joined_at())));
+            Map<String, EventProfile> refreshedProfiles = Map.copyOf(profiles);
             cachedUsernames = List.copyOf(refreshed);
-            cachedDisplayNames = refreshedDisplayNames;
+            cachedProfiles = refreshedProfiles;
             cacheLoadedAt = nanoTime.getAsLong();
         }
     }
@@ -132,8 +132,16 @@ public class DiscordMembersService {
         return nick;
     }
 
-    public record EventProfile(boolean member, String displayName) {}
+    public record EventProfile(boolean member, String displayName, List<String> roles, String joined_at) {
+        public EventProfile(boolean member, String displayName) {
+            this(member, displayName, List.of(), null);
+        }
+    }
     public record MemberResponse(String nick, List<String> roles) {}
-    public record DiscordMember(String nick, List<String> roles, DiscordUser user) {}
+    public record DiscordMember(String nick, List<String> roles, DiscordUser user, String joined_at) {
+        public DiscordMember(String nick, List<String> roles, DiscordUser user) {
+            this(nick, roles, user, null);
+        }
+    }
     public record DiscordUser(String id, String username, String global_name) {}
 }

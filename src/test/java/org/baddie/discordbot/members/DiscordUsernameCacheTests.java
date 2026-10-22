@@ -15,6 +15,18 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class DiscordUsernameCacheTests {
+    @Test void profilePreservesDiscordRoleIdsAndJoinTimestamp() {
+        server.expect(requestTo(FIRST_PAGE)).andRespond(withSuccess(
+                "[{\"user\":{\"id\":\"123456789012345679\",\"username\":\"operator\"},\"nick\":\"это текила\",\"roles\":[\"1000407417605083147\",\"1012647364256870411\"],\"joined_at\":\"2021-03-14T15:09:26.000Z\"}]",
+                MediaType.APPLICATION_JSON));
+        var profile = service.getEventProfile("operator");
+        assertThat(profile.member()).isTrue();
+        assertThat(profile.displayName()).isEqualTo("это текила");
+        assertThat(profile.roles()).containsExactly("1000407417605083147", "1012647364256870411");
+        assertThat(profile.joined_at()).isEqualTo("2021-03-14T15:09:26.000Z");
+        assertThat(service.getEventProfile("operator")).isEqualTo(profile);
+        server.verify();
+    }
     private final RestTemplate client = new RestTemplate();
     private final MockRestServiceServer server = MockRestServiceServer.createServer(client);
     private final AtomicLong now = new AtomicLong();
