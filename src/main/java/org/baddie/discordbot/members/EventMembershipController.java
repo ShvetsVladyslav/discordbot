@@ -25,7 +25,7 @@ public class EventMembershipController {
     }
 
     @GetMapping("/profile")
-    @Operation(summary = "Get guild display name by Discord username (shared 10-minute cache)")
+    @Operation(summary = "Get guild profile and avatar URL by Discord username (shared 10-minute cache)")
     public DiscordMembersService.EventProfile profile(@RequestParam String username) {
         validateUsername(username);
         return service.getEventProfile(username);

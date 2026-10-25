@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -60,7 +61,7 @@ public class DiscordMembersService {
 
     public synchronized EventProfile getEventProfile(String username) {
         refreshCacheIfNeeded();
-        return cachedProfiles.getOrDefault(username, new EventProfile(false, null, List.of(), null));
+        return cachedProfiles.getOrDefault(username, new EventProfile(false, null, List.of(), null, null));
     }
 
     private void refreshCacheIfNeeded() {
@@ -69,7 +70,8 @@ public class DiscordMembersService {
             List<String> refreshed = members.stream().map(member -> member.user().username()).toList();
             Map<String, EventProfile> profiles = new HashMap<>();
             members.forEach(member -> profiles.put(member.user().username(), new EventProfile(
-                    true, displayName(member), member.roles() == null ? List.of() : List.copyOf(member.roles()), member.joined_at())));
+                    true, displayName(member), member.roles() == null ? List.of() : List.copyOf(member.roles()),
+                    member.joined_at(), avatarUrl(member))));
             Map<String, EventProfile> refreshedProfiles = Map.copyOf(profiles);
             cachedUsernames = List.copyOf(refreshed);
             cachedProfiles = refreshedProfiles;
@@ -132,16 +134,53 @@ public class DiscordMembersService {
         return nick;
     }
 
-    public record EventProfile(boolean member, String displayName, List<String> roles, String joined_at) {
+    private String avatarUrl(DiscordMember member) {
+        var user = member.user();
+        if (isAvatarHash(member.avatar())) {
+            return imageUrl("guilds/" + guildId + "/users/" + user.id() + "/avatars/", member.avatar());
+        }
+        if (isAvatarHash(user.avatar())) {
+            return imageUrl("avatars/" + user.id() + "/", user.avatar());
+        }
+        String discriminator = user.discriminator();
+        int index = discriminator != null && discriminator.matches("[0-9]{1,4}")
+                && Integer.parseInt(discriminator) > 0
+                ? Integer.parseInt(discriminator) % 5
+                : new BigInteger(user.id()).shiftRight(22).mod(BigInteger.valueOf(6)).intValue();
+        return "https://cdn.discordapp.com/embed/avatars/" + index + ".png?size=512";
+    }
+
+    private static boolean isAvatarHash(String hash) {
+        return hash != null && hash.matches("(a_)?[a-f0-9]{32}");
+    }
+
+    private static String imageUrl(String path, String hash) {
+        // Animated WebP also supports avatars originally uploaded in newer image formats.
+        return "https://cdn.discordapp.com/" + path + hash
+                + (hash.startsWith("a_") ? ".webp?size=512&animated=true" : ".png?size=512");
+    }
+
+    public record EventProfile(boolean member, String displayName, List<String> roles, String joined_at,
+                               String avatarUrl) {
         public EventProfile(boolean member, String displayName) {
-            this(member, displayName, List.of(), null);
+            this(member, displayName, List.of(), null, null);
+        }
+        public EventProfile(boolean member, String displayName, List<String> roles, String joined_at) {
+            this(member, displayName, roles, joined_at, null);
         }
     }
     public record MemberResponse(String nick, List<String> roles) {}
-    public record DiscordMember(String nick, List<String> roles, DiscordUser user, String joined_at) {
+    public record DiscordMember(String nick, List<String> roles, DiscordUser user, String joined_at, String avatar) {
         public DiscordMember(String nick, List<String> roles, DiscordUser user) {
-            this(nick, roles, user, null);
+            this(nick, roles, user, null, null);
+        }
+        public DiscordMember(String nick, List<String> roles, DiscordUser user, String joined_at) {
+            this(nick, roles, user, joined_at, null);
         }
     }
-    public record DiscordUser(String id, String username, String global_name) {}
+    public record DiscordUser(String id, String username, String global_name, String avatar, String discriminator) {
+        public DiscordUser(String id, String username, String global_name) {
+            this(id, username, global_name, null, "0");
+        }
+    }
 }

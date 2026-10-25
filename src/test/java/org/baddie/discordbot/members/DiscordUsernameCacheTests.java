@@ -73,10 +73,12 @@ class DiscordUsernameCacheTests {
                 MediaType.APPLICATION_JSON));
         assertThat(service.usernameExists("operator")).isTrue();
         assertThat(service.getEventProfile("operator"))
-                .isEqualTo(new DiscordMembersService.EventProfile(true, "server nickname"));
+                .isEqualTo(new DiscordMembersService.EventProfile(true, "server nickname", java.util.List.of(), null,
+                        "https://cdn.discordapp.com/embed/avatars/0.png?size=512"));
         now.set(Duration.ofMinutes(10).toNanos());
         assertThat(service.getEventProfile("operator"))
-                .isEqualTo(new DiscordMembersService.EventProfile(true, "Global"));
+                .isEqualTo(new DiscordMembersService.EventProfile(true, "Global", java.util.List.of(), null,
+                        "https://cdn.discordapp.com/embed/avatars/0.png?size=512"));
         assertThat(service.usernameExists("operator")).isTrue();
         server.verify();
     }
